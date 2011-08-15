@@ -9,6 +9,7 @@ import annotation.tailrec
 import akka.AkkaException
 import akka.dispatch.Future
 import akka.actor._
+import akka.dispatch.Futures
 import akka.event.EventHandler
 import akka.actor.UntypedChannel._
 import java.util.concurrent.atomic.{ AtomicReference, AtomicInteger }
@@ -468,5 +469,43 @@ class RoundRobinRouter extends BasicRouter {
       else oldIndex
     }
   }
+
+}
+
+/*
+ * ScatterGatherRouter broadcasts the message to all connections and gathers results acorrding to the
+ * specified strategy.
+ * Scatter-gather pattern will be applied only to the messages broadcasted using Future 
+ * (wrapped into {@link Routing.Broadcast} and sent with "?" method). For other messages, the router
+ * would behave as {@link RoundRobinRouter} 
+ */
+trait ScatterGatherRouter extends RoundRobinRouter with Serializable {
+
+  /*
+     * Aggregates the responses into a single Future
+     * @param results Futures of the responses from connections
+     */
+  protected def gather[S, G >: S](results: Iterable[Future[S]]): Future[G]
+
+  private def scatterGather[S, G >: S](message: Any, timeout: Timeout)(implicit sender: Option[ActorRef]): Future[G] =
+    gather(connections
+      .versionedIterator._2
+      .map {
+        _.?(message, timeout)(sender).asInstanceOf[Future[S]]
+      })
+
+  override def route[T](message: Any, timeout: Timeout)(implicit sender: Option[ActorRef]): Future[T] = message match {
+    case Routing.Broadcast(message) ⇒ scatterGather(message, timeout)
+    case message                    ⇒ super.route(message, timeout)(sender)
+  }
+
+}
+
+/*
+ * Simple router that broadcasts the message to all connections, and replies with the first response
+ */
+class ScatterGatherFirstResponseRouter extends ScatterGatherRouter {
+
+  protected def gather[S, G >: S](results: Iterable[Future[S]]): Future[G] = Futures.firstCompletedOf(results)
 
 }
