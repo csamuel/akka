@@ -47,23 +47,37 @@ private[akka] object ActorRefInternals {
  * TODO document me
  */
 object Props {
-  object Default {
-    val creator: () ⇒ Actor = () ⇒ throw new UnsupportedOperationException("No actor creator specified!")
-    val deployId: String = ""
-    val dispatcher: MessageDispatcher = Dispatchers.defaultGlobalDispatcher
-    val timeout: Timeout = Timeout(Duration(Actor.TIMEOUT, "millis"))
-    val receiveTimeout: Option[Duration] = None
-    val lifeCycle: LifeCycle = Permanent
-    val faultHandler: FaultHandlingStrategy = NoFaultHandlingStrategy
-    val supervisor: Option[ActorRef] = None
-    val localOnly: Boolean = false
-  }
+  final val defaultCreator: () ⇒ Actor = () ⇒ throw new UnsupportedOperationException("No actor creator specified!")
+  final val defaultDeployId: String = ""
+  final val defaultDispatcher: MessageDispatcher = Dispatchers.defaultGlobalDispatcher
+  final val defaultTimeout: Timeout = Timeout(Duration(Actor.TIMEOUT, "millis"))
+  final val defaultReceiveTimeout: Option[Duration] = None
+  final val defaultLifeCycle: LifeCycle = Permanent
+  final val defaultFaultHandler: FaultHandlingStrategy = NoFaultHandlingStrategy
+  final val defaultSupervisor: Option[ActorRef] = None
+  final val defaultLocalOnly: Boolean = false
 
-  val default = new Props()
+  /**
+   * The default Props instance, uses the settings from the Props object starting with default*
+   */
+  final val default = new Props()
 
-  def apply[T <: Actor: Manifest]: Props =
-    default.withCreator(() ⇒ implicitly[Manifest[T]].erasure.asInstanceOf[Class[_ <: Actor]].newInstance)
+  /**
+   * Returns a cached default implementation of Props
+   */
+  def apply(): Props = default
 
+  /**
+   * Returns a Props that has default values except for "creator" which will be a function that creates an instance
+   * of the supplied type using the default constructor
+   */
+  def apply[T <: Actor: ClassManifest]: Props =
+    default.withCreator(() ⇒ implicitly[ClassManifest[T]].erasure.asInstanceOf[Class[_ <: Actor]].newInstance)
+
+  /**
+   * Returns a Props that has default values except for "creator" which will be a function that creates an instance
+   * of the supplied class using the default constructor
+   */
   def apply(actorClass: Class[_ <: Actor]): Props =
     default.withCreator(() ⇒ actorClass.newInstance)
 }
@@ -71,26 +85,29 @@ object Props {
 /**
  * ActorRef configuration object, this is thread safe and fully sharable
  */
-case class Props(creator: () ⇒ Actor = Props.Default.creator,
-                 deployId: String = Props.Default.deployId,
-                 dispatcher: MessageDispatcher = Props.Default.dispatcher,
-                 timeout: Timeout = Props.Default.timeout,
-                 receiveTimeout: Option[Duration] = Props.Default.receiveTimeout,
-                 lifeCycle: LifeCycle = Props.Default.lifeCycle,
-                 faultHandler: FaultHandlingStrategy = Props.Default.faultHandler,
-                 supervisor: Option[ActorRef] = Props.Default.supervisor,
-                 localOnly: Boolean = Props.Default.localOnly) {
-
+case class Props(creator: () ⇒ Actor = Props.defaultCreator,
+                 deployId: String = Props.defaultDeployId,
+                 dispatcher: MessageDispatcher = Props.defaultDispatcher,
+                 timeout: Timeout = Props.defaultTimeout,
+                 receiveTimeout: Option[Duration] = Props.defaultReceiveTimeout,
+                 lifeCycle: LifeCycle = Props.defaultLifeCycle,
+                 faultHandler: FaultHandlingStrategy = Props.defaultFaultHandler,
+                 supervisor: Option[ActorRef] = Props.defaultSupervisor,
+                 localOnly: Boolean = Props.defaultLocalOnly) {
+  /**
+   * No-args constructor that sets all the default values
+   * Java API
+   */
   def this() = this(
-    creator = Props.Default.creator,
-    deployId = Props.Default.deployId,
-    dispatcher = Props.Default.dispatcher,
-    timeout = Props.Default.timeout,
-    receiveTimeout = Props.Default.receiveTimeout,
-    lifeCycle = Props.Default.lifeCycle,
-    faultHandler = Props.Default.faultHandler,
-    supervisor = Props.Default.supervisor,
-    localOnly = Props.Default.localOnly)
+    creator = Props.defaultCreator,
+    deployId = Props.defaultDeployId,
+    dispatcher = Props.defaultDispatcher,
+    timeout = Props.defaultTimeout,
+    receiveTimeout = Props.defaultReceiveTimeout,
+    lifeCycle = Props.defaultLifeCycle,
+    faultHandler = Props.defaultFaultHandler,
+    supervisor = Props.defaultSupervisor,
+    localOnly = Props.defaultLocalOnly)
   /**
    * Returns a new Props with the specified creator set
    *  Scala API
