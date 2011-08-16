@@ -221,7 +221,7 @@ object TypedActor {
   private[akka] def configureAndProxyLocalActorRef[T <: AnyRef](interfaces: Array[Class[_]], proxyVar: AtomVar[T], props: Props, loader: ClassLoader): T = {
     //Warning, do not change order of the following statements, it's some elaborate chicken-n-egg handling
     val actorVar = new AtomVar[ActorRef](null)
-    val proxy: T = Proxy.newProxyInstance(loader, interfaces, new TypedActorInvocationHandler(actorVar)).asInstanceOf[T]
+    val proxy: T = Proxy.newProxyInstance(loader, interfaces, new TypedActorInvocationHandler(actorVar)(props.timeout)).asInstanceOf[T]
     proxyVar.set(proxy) // Chicken and egg situation we needed to solve, set the proxy so that we can set the self-reference inside each receive
     val ref = actorOf(props)
     actorVar.set(ref) //Make sure the InvocationHandler gets ahold of the actor reference, this is not a problem since the proxy hasn't escaped this method yet
@@ -252,10 +252,8 @@ object TypedActor {
     }
   }
 
-  private[akka] class TypedActorInvocationHandler(actorVar: AtomVar[ActorRef]) extends InvocationHandler {
+  private[akka] class TypedActorInvocationHandler(actorVar: AtomVar[ActorRef])(implicit timeout: Timeout) extends InvocationHandler {
     def actor = actorVar.get
-
-    implicit val timeout = Timeout(actor.timeout)
 
     def invoke(proxy: AnyRef, method: Method, args: Array[AnyRef]): AnyRef = method.getName match {
       case "toString" ⇒ actor.toString
