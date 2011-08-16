@@ -496,7 +496,7 @@ trait ScatterGatherRouter extends BasicRouter with Serializable {
 
   override def route[T](message: Any, timeout: Timeout)(implicit sender: Option[ActorRef]): Future[T] = message match {
     case Routing.Broadcast(message) ⇒ scatterGather(message, timeout)
-    case message                    ⇒ route(message, timeout)(sender)
+    case message                    ⇒ super.route(message, timeout)(sender)
   }
 
 }
