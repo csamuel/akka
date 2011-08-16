@@ -147,9 +147,6 @@ object Routing {
    *                                  how many connections it can handle.
    */
   def actorOf(actorAddress: String, connections: Iterable[ActorRef], routerType: RouterType): ActorRef = {
-    if (connections.size == 0)
-      throw new IllegalArgumentException("To create a routed actor ref, at least one connection is required")
-
     val ref = routerType match {
       case RouterType.Direct ⇒
         if (connections.size > 1)
@@ -167,6 +164,9 @@ object Routing {
   }
 
   def actorOf(actorAddress: String, connections: Iterable[ActorRef], router: Router): ActorRef = {
+    if (connections.size == 0)
+      throw new IllegalArgumentException("To create a routed actor ref, at least one connection is required")
+
     new RoutedActorRef(actorAddress, router, connections)
   }
 
@@ -476,10 +476,10 @@ class RoundRobinRouter extends BasicRouter {
  * ScatterGatherRouter broadcasts the message to all connections and gathers results acorrding to the
  * specified strategy.
  * Scatter-gather pattern will be applied only to the messages broadcasted using Future 
- * (wrapped into {@link Routing.Broadcast} and sent with "?" method). For other messages, the router
- * would behave as {@link RoundRobinRouter} 
+ * (wrapped into {@link Routing.Broadcast} and sent with "?" method). For the messages, sent in a fire-forget
+ * mode, the router would behave as {@link BasicRouter}, unless it's mixed in with other router type 
  */
-trait ScatterGatherRouter extends RoundRobinRouter with Serializable {
+trait ScatterGatherRouter extends BasicRouter with Serializable {
 
   /*
      * Aggregates the responses into a single Future
@@ -496,15 +496,18 @@ trait ScatterGatherRouter extends RoundRobinRouter with Serializable {
 
   override def route[T](message: Any, timeout: Timeout)(implicit sender: Option[ActorRef]): Future[T] = message match {
     case Routing.Broadcast(message) ⇒ scatterGather(message, timeout)
-    case message                    ⇒ super.route(message, timeout)(sender)
+    case message                    ⇒ route(message, timeout)(sender)
   }
 
 }
 
 /*
  * Simple router that broadcasts the message to all connections, and replies with the first response
+ * Scatter-gather pattern will be applied only to the messages broadcasted using Future 
+ * (wrapped into {@link Routing.Broadcast} and sent with "?" method). For the messages sent in a fire-forget
+ * mode, the router would behave as {@link RoundRobinRouter} 
  */
-class ScatterGatherFirstResponseRouter extends ScatterGatherRouter {
+class ScatterGatherFirstCompletedRouter extends RoundRobinRouter with ScatterGatherRouter {
 
   protected def gather[S, G >: S](results: Iterable[Future[S]]): Future[G] = Futures.firstCompletedOf(results)
 
