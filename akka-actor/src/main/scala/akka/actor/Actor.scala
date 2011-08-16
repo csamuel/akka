@@ -650,7 +650,7 @@ trait Actor {
    * </pre>
    */
   @transient
-  implicit val self: ScalaActorRef = someSelf.get
+  implicit val self: ScalaActorRef with SelfActorRef = someSelf.get.asInstanceOf[ScalaActorRef with SelfActorRef]
 
   /**
    * User overridable callback/setting.

@@ -125,8 +125,14 @@ object ActorSerialization {
 
     lifeCycleProtocol.foreach(builder.setLifeCycle(_))
     actorRef.supervisor.foreach(s ⇒ builder.setSupervisor(RemoteActorSerialization.toRemoteActorRefProtocol(s)))
-    // if (!actorRef.hotswap.isEmpty) builder.setHotswapStack(ByteString.copyFrom(Serializers.Java.toBinary(actorRef.hotswap)))
-    if (!actorRef.hotswap.isEmpty) builder.setHotswapStack(ByteString.copyFrom(akka.serialization.JavaSerializer.toBinary(actorRef.hotswap)))
+    actorRef match {
+      case l: LocalActorRef ⇒
+        val stack = l.hotswap
+        if (!stack.isEmpty)
+          builder.setHotswapStack(ByteString.copyFrom(akka.serialization.JavaSerializer.toBinary(stack)))
+      case _ ⇒
+    }
+
     builder.build
   }
 

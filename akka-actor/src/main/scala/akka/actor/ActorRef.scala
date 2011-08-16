@@ -321,12 +321,6 @@ abstract class ActorRef extends ActorRefShared with ForwardableChannel with Repl
   def getDispatcher: MessageDispatcher = dispatcher
 
   /**
-   *   Holds the hot swapped partial function.
-   */
-  @volatile
-  protected[akka] var hotswap = Stack[PartialFunction[Any, Unit]]()
-
-  /**
    *  This is a reference to the message currently being processed by the actor
    */
   @volatile
@@ -581,13 +575,21 @@ abstract class ActorRef extends ActorRefShared with ForwardableChannel with Repl
   override def toString = "Actor[%s:%s]".format(address, uuid)
 }
 
+trait SelfActorRef { self: ActorRef with ScalaActorRef ⇒
+  /**
+   *   Holds the hot swapped partial function.
+   */
+  @volatile
+  protected[akka] var hotswap = Stack[PartialFunction[Any, Unit]]()
+}
+
 /**
  *  Local (serializable) ActorRef that is used when referencing the Actor on its "home" node.
  *
  * @author <a href="http://jonasboner.com">Jonas Bon&#233;r</a>
  */
 class LocalActorRef private[akka] (private[this] val actorFactory: () ⇒ Actor, val address: String)
-  extends ActorRef with ScalaActorRef {
+  extends ActorRef with ScalaActorRef with SelfActorRef {
 
   protected[akka] val guard = new ReentrantGuard
 
