@@ -14,6 +14,48 @@ class Ticket1111Spec extends WordSpec with MustMatchers {
 
   "Scatter-gather router" must {
 
+    "return response, even if one of the connections has stopped" in {
+
+      val actor = Routing.actorOf("foo", List(newActor(0), newActor(1)),
+        new ScatterGatherFirstCompletedRouter()).start()
+
+      actor ! Broadcast(Stop(Some(0)))
+
+      (actor ? Broadcast(0)).get.asInstanceOf[Int] must be(1)
+
+    }
+
+    "throw an exception, if all the connections have stopped" in {
+
+      val actor = Routing.actorOf("foo", List(newActor(0), newActor(1)),
+        new ScatterGatherFirstCompletedRouter()).start()
+
+      actor ! Broadcast(Stop())
+
+      (intercept[RoutingException] {
+        actor ? Broadcast(0)
+      }) must not be (null)
+
+    }
+
+    "return the first response from connections, when all of them replied" in {
+
+      val actor = Routing.actorOf("foo", List(newActor(0), newActor(1)),
+        new ScatterGatherFirstCompletedRouter()).start()
+
+      (actor ? Broadcast("Hi!")).get.asInstanceOf[Int] must be(0)
+
+    }
+
+    "return the first response from connections, when some of them failed to reply" in {
+
+      val actor = Routing.actorOf("foo", List(newActor(0), newActor(1)),
+        new ScatterGatherFirstCompletedRouter()).start()
+
+      (actor ? Broadcast(0)).get.asInstanceOf[Int] must be(1)
+
+    }
+
     "be started when constructed" in {
 
       val actor = Routing.actorOf("foo", List(newActor(0)),
@@ -100,28 +142,14 @@ class Ticket1111Spec extends WordSpec with MustMatchers {
       counter2.get must be(1)
     }
 
-    "return the first response from connections, when all of them replied" in {
-
-      val actor = Routing.actorOf("foo", List(newActor(0), newActor(1)),
-        new ScatterGatherFirstCompletedRouter()).start()
-
-      (actor ? Broadcast("Hi!")).get.asInstanceOf[Int] must be(0)
-
-    }
-
-    "return the first response from connections, when some of them failed to reply" in {
-
-      val actor = Routing.actorOf("foo", List(newActor(0), newActor(1)),
-        new ScatterGatherFirstCompletedRouter()).start()
-
-      (actor ? Broadcast(0)).get.asInstanceOf[Int] must be(1)
-
-    }
+    case class Stop(id: Option[Int] = None)
 
     def newActor(id: Int) = actorOf(new Actor {
       def receive = {
-        case _id: Int if (_id == id) ⇒
-        case _                       ⇒ Thread sleep 100 * id; self reply id
+        case Stop(None)                     ⇒ self.stop()
+        case Stop(Some(_id)) if (_id == id) ⇒ self.stop()
+        case _id: Int if (_id == id)        ⇒
+        case _                              ⇒ Thread sleep 100 * id; self tryReply id
       }
     }).start()
 

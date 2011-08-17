@@ -490,8 +490,8 @@ trait ScatterGatherRouter extends BasicRouter with Serializable {
      */
   protected def gather[S, G >: S](results: Iterable[Future[S]]): Future[G]
 
-  private def scatterGather[S, G >: S](message: Any, timeout: Timeout)(implicit sender: Option[ActorRef]): Future[G] =
-    gather(connections.versionedIterator._2.flatMap { actor ⇒
+  private def scatterGather[S, G >: S](message: Any, timeout: Timeout)(implicit sender: Option[ActorRef]): Future[G] = {
+    val responses = connections.versionedIterator._2.flatMap { actor ⇒
       try {
         Some(actor.?(message, timeout)(sender).asInstanceOf[Future[S]])
       } catch {
@@ -499,7 +499,13 @@ trait ScatterGatherRouter extends BasicRouter with Serializable {
           connections.signalDeadActor(actor)
           None
       }
-    })
+    }
+
+    if (responses.size == 0)
+      throw new RoutingException("No connections can process the message [%s] sent to scatter-gather router" format (message))
+
+    gather(responses)
+  }
 
   override def route[T](message: Any, timeout: Timeout)(implicit sender: Option[ActorRef]): Future[T] = message match {
     case Routing.Broadcast(message) ⇒ scatterGather(message, timeout)
