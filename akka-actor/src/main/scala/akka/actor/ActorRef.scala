@@ -339,22 +339,6 @@ abstract class ActorRef extends ActorRefShared with ForwardableChannel with Repl
   def uuid = _uuid
 
   /**
-   * Akka Java API. <p/>
-   * The reference sender Actor of the last received message.
-   * Is defined if the message was sent from another Actor, else None.
-   */
-  @deprecated("will be removed in 2.0, use channel instead", "1.2")
-  def getSender: Option[ActorRef] = sender
-
-  /**
-   * Akka Java API. <p/>
-   * The reference sender future of the last received message.
-   * Is defined if the message was sent with sent with '?'/'ask', else None.
-   */
-  @deprecated("will be removed in 2.0, use channel instead", "1.2")
-  def getSenderFuture: Option[Promise[Any]] = senderFuture
-
-  /**
    * Is the actor being restarted?
    */
   def isBeingRestarted: Boolean = _status == ActorRefInternals.BEING_RESTARTED
@@ -581,6 +565,36 @@ trait SelfActorRef { self: ActorRef with ScalaActorRef ⇒
    */
   @volatile
   protected[akka] var hotswap = Stack[PartialFunction[Any, Unit]]()
+
+  /**
+   * Akka Java API. <p/>
+   * The reference sender Actor of the last received message.
+   * Is defined if the message was sent from another Actor, else None.
+   */
+  @deprecated("will be removed in 2.0, use channel instead", "1.2")
+  def getSender: Option[ActorRef] = sender
+
+  /**
+   * Akka Java API. <p/>
+   * The reference sender future of the last received message.
+   * Is defined if the message was sent with sent with '?'/'ask', else None.
+   */
+  @deprecated("will be removed in 2.0, use channel instead", "1.2")
+  def getSenderFuture: Option[Promise[Any]] = senderFuture
+
+  /**
+   * The reference sender Actor of the last received message.
+   * Is defined if the message was sent from another Actor, else None.
+   */
+  @deprecated("will be removed in 2.0, use channel instead", "1.2")
+  def sender: Option[ActorRef]
+
+  /**
+   * The reference sender future of the last received message.
+   * Is defined if the message was sent with sent with '?'/'ask', else None.
+   */
+  @deprecated("will be removed in 2.0, use channel instead", "1.2")
+  def senderFuture(): Option[Promise[Any]]
 }
 
 /**
@@ -797,6 +811,34 @@ class LocalActorRef private[akka] (private[this] val actorFactory: () ⇒ Actor,
   protected[akka] def mailbox_=(value: AnyRef): AnyRef = {
     _mailbox = value;
     value
+  }
+
+  /**
+   * The reference sender Actor of the last received message.
+   * Is defined if the message was sent from another Actor, else None.
+   */
+  @deprecated("will be removed in 2.0, use channel instead", "1.2")
+  def sender: Option[ActorRef] = {
+    val msg = currentMessage
+    if (msg eq null) None
+    else msg.channel match {
+      case ref: ActorRef ⇒ Some(ref)
+      case _             ⇒ None
+    }
+  }
+
+  /**
+   * The reference sender future of the last received message.
+   * Is defined if the message was sent with sent with '?'/'ask', else None.
+   */
+  @deprecated("will be removed in 2.0, use channel instead", "1.2")
+  def senderFuture(): Option[Promise[Any]] = {
+    val msg = currentMessage
+    if (msg eq null) None
+    else msg.channel match {
+      case f: ActorPromise ⇒ Some(f)
+      case _               ⇒ None
+    }
   }
 
   /**
@@ -1307,34 +1349,6 @@ trait ScalaActorRef extends ActorRefShared with ForwardableChannel with ReplyCha
   @volatile
   @BeanProperty
   var faultHandler: FaultHandlingStrategy = NoFaultHandlingStrategy
-
-  /**
-   * The reference sender Actor of the last received message.
-   * Is defined if the message was sent from another Actor, else None.
-   */
-  @deprecated("will be removed in 2.0, use channel instead", "1.2")
-  def sender: Option[ActorRef] = {
-    val msg = currentMessage
-    if (msg eq null) None
-    else msg.channel match {
-      case ref: ActorRef ⇒ Some(ref)
-      case _             ⇒ None
-    }
-  }
-
-  /**
-   * The reference sender future of the last received message.
-   * Is defined if the message was sent with sent with '?'/'ask', else None.
-   */
-  @deprecated("will be removed in 2.0, use channel instead", "1.2")
-  def senderFuture(): Option[Promise[Any]] = {
-    val msg = currentMessage
-    if (msg eq null) None
-    else msg.channel match {
-      case f: ActorPromise ⇒ Some(f)
-      case _               ⇒ None
-    }
-  }
 
   /**
    * Sends a one-way asynchronous message. E.g. fire-and-forget semantics.

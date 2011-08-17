@@ -125,12 +125,12 @@ object DeploymentConfig {
   sealed trait ReplicationStrategy
 
   // For Java API
-  case class WriteBehind() extends ReplicationStrategy
-  case class WriteThrough() extends ReplicationStrategy
+  sealed class WriteBehind extends ReplicationStrategy
+  sealed class WriteThrough extends ReplicationStrategy
 
   // For Scala API
-  case object WriteBehind extends ReplicationStrategy
-  case object WriteThrough extends ReplicationStrategy
+  case object WriteBehind extends WriteBehind
+  case object WriteThrough extends WriteThrough
 
   // --------------------------------
   // --- Helper methods for parsing

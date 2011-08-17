@@ -86,8 +86,8 @@ object ActorSerialization {
         builder.setReplicationStorage(storageType)
 
         val strategyType = strategy match {
-          case _: WriteBehind | WriteBehind   ⇒ ReplicationStrategyType.WRITE_BEHIND
-          case _: WriteThrough | WriteThrough ⇒ ReplicationStrategyType.WRITE_THROUGH
+          case _: WriteBehind  ⇒ ReplicationStrategyType.WRITE_BEHIND
+          case _: WriteThrough ⇒ ReplicationStrategyType.WRITE_THROUGH
         }
         builder.setReplicationStrategy(strategyType)
     }
@@ -104,15 +104,20 @@ object ActorSerialization {
         }
 
       val requestProtocols =
-        messages.map(m ⇒
-          RemoteActorSerialization.createRemoteMessageProtocolBuilder(
-            Some(actorRef),
-            Left(actorRef.uuid),
-            actorRef.address,
-            actorRef.timeout,
-            Right(m.message),
-            false,
-            actorRef.getSender))
+        messages.collect {
+          case m: MessageInvocation ⇒
+            RemoteActorSerialization.createRemoteMessageProtocolBuilder(
+              Option(m.receiver),
+              Left(actorRef.uuid),
+              actorRef.address,
+              actorRef.timeout,
+              Right(m.message),
+              false,
+              m.channel match {
+                case a: ActorRef ⇒ Some(a)
+                case _           ⇒ None
+              })
+        }
 
       requestProtocols.foreach(builder.addMessages(_))
     }
