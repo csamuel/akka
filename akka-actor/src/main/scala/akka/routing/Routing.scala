@@ -473,11 +473,14 @@ class RoundRobinRouter extends BasicRouter {
 }
 
 /*
- * ScatterGatherRouter broadcasts the message to all connections and gathers results acorrding to the
- * specified strategy.
+ * ScatterGatherRouter broadcasts the message to all connections and gathers results according to the
+ * specified strategy (specific router needs to implement `gather` method).
  * Scatter-gather pattern will be applied only to the messages broadcasted using Future 
  * (wrapped into {@link Routing.Broadcast} and sent with "?" method). For the messages, sent in a fire-forget
  * mode, the router would behave as {@link BasicRouter}, unless it's mixed in with other router type 
+ * 
+ *  FIXME: This also is the location where a failover  is done in the future if an ActorRef fails and a different one needs to be selected.
+ * FIXME: this is also the location where message buffering should be done in case of failure.
  */
 trait ScatterGatherRouter extends BasicRouter with Serializable {
 
@@ -488,11 +491,15 @@ trait ScatterGatherRouter extends BasicRouter with Serializable {
   protected def gather[S, G >: S](results: Iterable[Future[S]]): Future[G]
 
   private def scatterGather[S, G >: S](message: Any, timeout: Timeout)(implicit sender: Option[ActorRef]): Future[G] =
-    gather(connections
-      .versionedIterator._2
-      .map {
-        _.?(message, timeout)(sender).asInstanceOf[Future[S]]
-      })
+    gather(connections.versionedIterator._2.flatMap { actor ⇒
+      try {
+        Some(actor.?(message, timeout)(sender).asInstanceOf[Future[S]])
+      } catch {
+        case e: Exception ⇒
+          connections.signalDeadActor(actor)
+          None
+      }
+    })
 
   override def route[T](message: Any, timeout: Timeout)(implicit sender: Option[ActorRef]): Future[T] = message match {
     case Routing.Broadcast(message) ⇒ scatterGather(message, timeout)
