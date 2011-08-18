@@ -273,7 +273,10 @@ trait MailboxPressureCapacitor {
  */
 trait ActiveFuturesPressureCapacitor {
   def pressure(delegates: Seq[ActorRef]): Int =
-    delegates count { _.channel.isInstanceOf[Promise[_]] }
+    delegates count {
+      case fc: ForwardableChannel ⇒ fc.channel.isInstanceOf[Promise[_]]
+      case _                      ⇒ false
+    }
 }
 
 /**

@@ -225,7 +225,7 @@ case class Props(creator: () ⇒ Actor = Props.defaultCreator,
  *
  * @author <a href="http://jonasboner.com">Jonas Bon&#233;r</a>
  */
-abstract class ActorRef extends ActorRefShared with ForwardableChannel with ReplyChannel[Any] with java.lang.Comparable[ActorRef] with Serializable {
+abstract class ActorRef extends ActorRefShared with UntypedChannel with ReplyChannel[Any] with java.lang.Comparable[ActorRef] with Serializable {
   scalaRef: ScalaActorRef ⇒
   // Only mutable for RemoteServer in order to maintain identity across nodes
   @volatile
@@ -407,35 +407,10 @@ abstract class ActorRef extends ActorRefShared with ForwardableChannel with Repl
    * Akka Java API. <p/>
    * Forwards the message specified to this actor and preserves the original sender of the message
    */
-  def forward(message: AnyRef, sender: ActorRef) {
+  def forward(message: AnyRef, sender: SelfActorRef) {
     if (sender eq null) throw new IllegalArgumentException("The 'sender' argument to 'forward' can't be null")
     else forward(message)(sender)
   }
-
-  /**
-   * Akka Scala & Java API
-   * Use <code>self.reply(..)</code> to reply with a message to the original sender of the message currently
-   * being processed. This method  fails if the original sender of the message could not be determined with an
-   * IllegalStateException.
-   *
-   * If you don't want deal with this IllegalStateException, but just a boolean, just use the <code>tryReply(...)</code>
-   * version.
-   *
-   * <p/>
-   * Throws an IllegalStateException if unable to determine what to reply to.
-   */
-  def reply(message: Any) = channel.!(message)(this)
-
-  /**
-   * Akka Scala & Java API
-   * Use <code>tryReply(..)</code> to try reply with a message to the original sender of the message currently
-   * being processed. This method
-   * <p/>
-   * Returns true if reply was sent, and false if unable to determine what to reply to.
-   *
-   * If you would rather have an exception, check the <code>reply(..)</code> version.
-   */
-  def tryReply(message: Any): Boolean = channel.tryTell(message)(this)
 
   /**
    * Sets the dispatcher for this actor. Needs to be invoked before the actor is started.
@@ -509,21 +484,6 @@ abstract class ActorRef extends ActorRefShared with ForwardableChannel with Repl
    */
   def getLinkedActors: JMap[Uuid, ActorRef] = linkedActors
 
-  /**
-   * Abstraction for unification of sender and senderFuture for later reply
-   */
-  def channel: UntypedChannel = {
-    val msg = currentMessage
-    if (msg ne null) msg.channel
-    else NullChannel
-  }
-
-  /**
-   * Java API. <p/>
-   * Abstraction for unification of sender and senderFuture for later reply
-   */
-  def getChannel: UntypedChannel = channel
-
   protected[akka] def invoke(messageHandle: MessageInvocation)
 
   protected[akka] def postMessageToMailbox(message: Any, channel: UntypedChannel): Unit
@@ -555,7 +515,7 @@ abstract class ActorRef extends ActorRefShared with ForwardableChannel with Repl
   override def toString = "Actor[%s:%s]".format(address, uuid)
 }
 
-trait SelfActorRef { self: ActorRef with ScalaActorRef ⇒
+abstract class SelfActorRef extends ActorRef with ForwardableChannel { self: LocalActorRef with ScalaActorRef ⇒
   /**
    *   Holds the hot swapped partial function.
    */
@@ -591,6 +551,45 @@ trait SelfActorRef { self: ActorRef with ScalaActorRef ⇒
    */
   @deprecated("will be removed in 2.0, use channel instead", "1.2")
   def senderFuture(): Option[Promise[Any]]
+
+  /**
+   * Abstraction for unification of sender and senderFuture for later reply
+   */
+  def channel: UntypedChannel = self.currentMessage match {
+    case null ⇒ NullChannel
+    case msg  ⇒ msg.channel
+  }
+
+  /**
+   * Java API. <p/>
+   * Abstraction for unification of sender and senderFuture for later reply
+   */
+  def getChannel: UntypedChannel = channel
+
+  /**
+   * Akka Scala & Java API
+   * Use <code>self.reply(..)</code> to reply with a message to the original sender of the message currently
+   * being processed. This method  fails if the original sender of the message could not be determined with an
+   * IllegalStateException.
+   *
+   * If you don't want deal with this IllegalStateException, but just a boolean, just use the <code>tryReply(...)</code>
+   * version.
+   *
+   * <p/>
+   * Throws an IllegalStateException if unable to determine what to reply to.
+   */
+  def reply(message: Any) = channel.!(message)(this)
+
+  /**
+   * Akka Scala & Java API
+   * Use <code>tryReply(..)</code> to try reply with a message to the original sender of the message currently
+   * being processed. This method
+   * <p/>
+   * Returns true if reply was sent, and false if unable to determine what to reply to.
+   *
+   * If you would rather have an exception, check the <code>reply(..)</code> version.
+   */
+  def tryReply(message: Any): Boolean = channel.tryTell(message)(this)
 }
 
 /**
@@ -599,7 +598,7 @@ trait SelfActorRef { self: ActorRef with ScalaActorRef ⇒
  * @author <a href="http://jonasboner.com">Jonas Bon&#233;r</a>
  */
 class LocalActorRef private[akka] (private[this] val actorFactory: () ⇒ Actor, val address: String)
-  extends ActorRef with ScalaActorRef with SelfActorRef {
+  extends SelfActorRef with ScalaActorRef {
 
   protected[akka] val guard = new ReentrantGuard
 
@@ -1297,7 +1296,7 @@ trait ActorRefShared {
  * There are implicit conversions in ../actor/Implicits.scala
  * from ActorRef -> ScalaActorRef and back
  */
-trait ScalaActorRef extends ActorRefShared with ForwardableChannel with ReplyChannel[Any] {
+trait ScalaActorRef extends ActorRefShared with ReplyChannel[Any] {
   ref: ActorRef ⇒
 
   /**
