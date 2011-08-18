@@ -61,6 +61,11 @@ object ActorSerialization {
     serializeMailBox: Boolean,
     replicationScheme: ReplicationScheme): SerializedActorRefProtocol = {
 
+    val localRef: Option[LocalActorRef] = actorRef match {
+      case l: LocalActorRef ⇒ Some(l)
+      case _                ⇒ None
+    }
+
     val lifeCycleProtocol: Option[LifeCycleProtocol] = {
       actorRef.lifeCycle match {
         case Permanent          ⇒ Some(LifeCycleProtocol.newBuilder.setLifeCycle(LifeCycleType.PERMANENT).build)
@@ -93,38 +98,34 @@ object ActorSerialization {
         builder.setReplicationStrategy(strategyType)
     }
 
-    if (serializeMailBox == true) {
-      actorRef match {
-        case l: LocalActorRef ⇒
-          l.mailbox match {
-            case null ⇒ throw new IllegalActorStateException("Can't serialize an actor that has not been started.")
-            case q: java.util.Queue[_] ⇒
-              val l = new scala.collection.mutable.ListBuffer[MessageInvocation]
-              val it = q.iterator
-              while (it.hasNext) l += it.next.asInstanceOf[MessageInvocation]
+    if (serializeMailBox == true && localRef.isDefined) {
+      val l = localRef.get
+      l.mailbox match {
+        case null ⇒ throw new IllegalActorStateException("Can't serialize an actor that has not been started.")
+        case q: java.util.Queue[_] ⇒
+          val l = new scala.collection.mutable.ListBuffer[MessageInvocation]
+          val it = q.iterator
+          while (it.hasNext) l += it.next.asInstanceOf[MessageInvocation]
 
-              l map { m ⇒
-                RemoteActorSerialization.createRemoteMessageProtocolBuilder(
-                  Option(m.receiver),
-                  Left(actorRef.uuid),
-                  actorRef.address,
-                  actorRef.timeout,
-                  Right(m.message),
-                  false,
-                  m.channel match {
-                    case a: ActorRef ⇒ Some(a)
-                    case _           ⇒ None
-                  })
-              } foreach {
-                builder.addMessages(_)
-              }
-            case _ ⇒
+          l map { m ⇒
+            RemoteActorSerialization.createRemoteMessageProtocolBuilder(
+              Option(m.receiver),
+              Left(actorRef.uuid),
+              actorRef.address,
+              actorRef.timeout,
+              Right(m.message),
+              false,
+              m.channel match {
+                case a: ActorRef ⇒ Some(a)
+                case _           ⇒ None
+              })
+          } foreach {
+            builder.addMessages(_)
           }
-        case _ ⇒
       }
     }
 
-    actorRef.receiveTimeout.foreach(builder.setReceiveTimeout(_))
+    localRef.foreach(_.receiveTimeout.foreach(builder.setReceiveTimeout(_)))
     Serialization.serialize(actorRef.actor.asInstanceOf[T]) match {
       case Right(bytes)    ⇒ builder.setActorInstance(ByteString.copyFrom(bytes))
       case Left(exception) ⇒ throw new Exception("Error serializing : " + actorRef.actor.getClass.getName)

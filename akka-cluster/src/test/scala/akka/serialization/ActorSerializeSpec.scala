@@ -21,13 +21,12 @@ class ActorSerializeSpec extends Spec with ShouldMatchers with BeforeAndAfterAll
   describe("Serializable actor") {
     it("should be able to serialize and de-serialize a stateful actor with a given serializer") {
 
-      val actor1 = localActorOf[MyJavaSerializableActor].start()
+      val actor1 = localActorOf[MyJavaSerializableActor].start().asInstanceOf[LocalActorRef]
       (actor1 ? "hello").get should equal("world 1")
       (actor1 ? "hello").get should equal("world 2")
 
       val bytes = toBinary(actor1)
-      val actor2 = fromBinary(bytes)
-      actor2.start()
+      val actor2 = fromBinary(bytes).start().asInstanceOf[LocalActorRef]
       (actor2 ? "hello").get should equal("world 3")
 
       actor2.receiveTimeout should equal(Some(1000))

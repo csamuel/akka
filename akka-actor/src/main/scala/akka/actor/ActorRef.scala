@@ -247,26 +247,6 @@ abstract class ActorRef extends ActorRefShared with UntypedChannel with ReplyCha
   var timeout: Long = Actor.TIMEOUT
 
   /**
-   * User overridable callback/setting.
-   * <p/>
-   * Defines the default timeout for an initial receive invocation.
-   * When specified, the receive function should be able to handle a 'ReceiveTimeout' message.
-   */
-  @volatile
-  var receiveTimeout: Option[Long] = None
-
-  /**
-   * Akka Java API. <p/>
-   * Defines the default timeout for an initial receive invocation.
-   * When specified, the receive function should be able to handle a 'ReceiveTimeout' message.
-   */
-  def setReceiveTimeout(timeout: Long) {
-    this.receiveTimeout = Some(timeout)
-  }
-
-  def getReceiveTimeout: Option[Long] = receiveTimeout
-
-  /**
    * Akka Java API. <p/>
    *  A faultHandler defines what should be done when a linked actor signals an error.
    * <p/>
@@ -518,9 +498,19 @@ abstract class ActorRef extends ActorRefShared with UntypedChannel with ReplyCha
 abstract class SelfActorRef extends ActorRef with ForwardableChannel { self: LocalActorRef with ScalaActorRef ⇒
   /**
    *   Holds the hot swapped partial function.
+   *   WARNING: DO NOT USE THIS, IT IS INTERNAL AKKA USE ONLY
    */
   @volatile
   protected[akka] var hotswap = Stack[PartialFunction[Any, Unit]]()
+
+  /**
+   * User overridable callback/setting.
+   * <p/>
+   * Defines the default timeout for an initial receive invocation.
+   * When specified, the receive function should be able to handle a 'ReceiveTimeout' message.
+   */
+  @volatile
+  var receiveTimeout: Option[Long] = None
 
   /**
    * Akka Java API. <p/>
@@ -559,6 +549,17 @@ abstract class SelfActorRef extends ActorRef with ForwardableChannel { self: Loc
     case null ⇒ NullChannel
     case msg  ⇒ msg.channel
   }
+
+  /**
+   * Akka Java API. <p/>
+   * Defines the default timeout for an initial receive invocation.
+   * When specified, the receive function should be able to handle a 'ReceiveTimeout' message.
+   */
+  def setReceiveTimeout(timeout: Long) {
+    this.receiveTimeout = Some(timeout)
+  }
+
+  def getReceiveTimeout: Option[Long] = receiveTimeout
 
   /**
    * Java API. <p/>
@@ -1135,9 +1136,10 @@ class LocalActorRef private[akka] (private[this] val actorFactory: () ⇒ Actor,
 
   protected[akka] def checkReceiveTimeout() {
     cancelReceiveTimeout()
-    if (receiveTimeout.isDefined && dispatcher.mailboxIsEmpty(this)) {
+    val recvtimeout = receiveTimeout
+    if (recvtimeout.isDefined && dispatcher.mailboxIsEmpty(this)) {
       //Only reschedule if desired and there are currently no more messages to be processed
-      _futureTimeout = Some(Scheduler.scheduleOnce(this, ReceiveTimeout, receiveTimeout.get, TimeUnit.MILLISECONDS))
+      _futureTimeout = Some(Scheduler.scheduleOnce(this, ReceiveTimeout, recvtimeout.get, TimeUnit.MILLISECONDS))
     }
   }
 
