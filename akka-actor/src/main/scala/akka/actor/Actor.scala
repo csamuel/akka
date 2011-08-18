@@ -36,7 +36,7 @@ sealed trait LifeCycleMessage extends Serializable
  */
 sealed trait AutoReceivedMessage { self: LifeCycleMessage ⇒ }
 
-case class HotSwap(code: ActorRef ⇒ Actor.Receive, discardOld: Boolean = true) extends AutoReceivedMessage with LifeCycleMessage {
+case class HotSwap(code: SelfActorRef ⇒ Actor.Receive, discardOld: Boolean = true) extends AutoReceivedMessage with LifeCycleMessage {
 
   /**
    * Java API
@@ -172,8 +172,8 @@ object Actor {
    */
   type Receive = PartialFunction[Any, Unit]
 
-  private[actor] val actorRefInCreation = new ThreadLocal[Stack[ActorRef]] {
-    override def initialValue = Stack[ActorRef]()
+  private[actor] val actorRefInCreation = new ThreadLocal[Stack[ScalaActorRef with SelfActorRef]] {
+    override def initialValue = Stack[ScalaActorRef with SelfActorRef]()
   }
 
   private[akka] val TIMEOUT = Duration(config.getInt("akka.actor.timeout", 5), TIME_UNIT).toMillis
@@ -592,7 +592,7 @@ trait Actor {
    * the 'forward' function.
    */
   @transient
-  val someSelf: Some[ActorRef] = {
+  val someSelf: Some[ScalaActorRef with SelfActorRef] = {
     val refStack = Actor.actorRefInCreation.get
     if (refStack.isEmpty) throw new ActorInitializationException(
       "\n\tYou can not create an instance of an " + getClass.getName + " explicitly using 'new MyActor'." +
@@ -618,7 +618,7 @@ trait Actor {
    * Mainly for internal use, functions as the implicit sender references when invoking
    * one of the message send functions ('!' and '?').
    */
-  def optionSelf: Option[ActorRef] = someSelf
+  def optionSelf: Option[ScalaActorRef with SelfActorRef] = someSelf
 
   /**
    * The 'self' field holds the ActorRef for this actor.
@@ -648,7 +648,7 @@ trait Actor {
    * </pre>
    */
   @transient
-  implicit val self: ScalaActorRef with SelfActorRef = someSelf.get.asInstanceOf[ScalaActorRef with SelfActorRef]
+  implicit val self = someSelf.get
 
   /**
    * User overridable callback/setting.
