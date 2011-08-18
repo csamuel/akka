@@ -79,5 +79,5 @@ class ZooKeeperBasedMailbox(val owner: ActorRef) extends DurableExecutableMailbo
     case e ⇒ false
   }
 
-  def close = zkClient.close
+  def close() = zkClient.close
 }

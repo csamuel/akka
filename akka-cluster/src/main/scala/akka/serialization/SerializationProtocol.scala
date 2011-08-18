@@ -22,6 +22,7 @@ import com.google.protobuf.ByteString
 
 import com.eaio.uuid.UUID
 import akka.event.EventHandler
+import java.util.{ LinkedList, Collections }
 
 /**
  * Module for local actor serialization.
@@ -93,33 +94,34 @@ object ActorSerialization {
     }
 
     if (serializeMailBox == true) {
-      if (actorRef.mailbox eq null) throw new IllegalActorStateException("Can't serialize an actor that has not been started.")
-      val messages =
-        actorRef.mailbox match {
-          case q: java.util.Queue[_] ⇒
-            val l = new scala.collection.mutable.ListBuffer[MessageInvocation]
-            val it = q.iterator
-            while (it.hasNext) l += it.next.asInstanceOf[MessageInvocation]
-            l
-        }
+      actorRef match {
+        case l: LocalActorRef ⇒
+          l.mailbox match {
+            case null ⇒ throw new IllegalActorStateException("Can't serialize an actor that has not been started.")
+            case q: java.util.Queue[_] ⇒
+              val l = new scala.collection.mutable.ListBuffer[MessageInvocation]
+              val it = q.iterator
+              while (it.hasNext) l += it.next.asInstanceOf[MessageInvocation]
 
-      val requestProtocols =
-        messages.collect {
-          case m: MessageInvocation ⇒
-            RemoteActorSerialization.createRemoteMessageProtocolBuilder(
-              Option(m.receiver),
-              Left(actorRef.uuid),
-              actorRef.address,
-              actorRef.timeout,
-              Right(m.message),
-              false,
-              m.channel match {
-                case a: ActorRef ⇒ Some(a)
-                case _           ⇒ None
-              })
-        }
-
-      requestProtocols.foreach(builder.addMessages(_))
+              l map { m ⇒
+                RemoteActorSerialization.createRemoteMessageProtocolBuilder(
+                  Option(m.receiver),
+                  Left(actorRef.uuid),
+                  actorRef.address,
+                  actorRef.timeout,
+                  Right(m.message),
+                  false,
+                  m.channel match {
+                    case a: ActorRef ⇒ Some(a)
+                    case _           ⇒ None
+                  })
+              } foreach {
+                builder.addMessages(_)
+              }
+            case _ ⇒
+          }
+        case _ ⇒
+      }
     }
 
     actorRef.receiveTimeout.foreach(builder.setReceiveTimeout(_))

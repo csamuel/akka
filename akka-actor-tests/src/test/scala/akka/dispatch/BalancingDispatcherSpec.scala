@@ -6,9 +6,9 @@ import org.scalatest.junit.JUnitSuite
 import org.junit.Test
 
 import java.util.concurrent.{ TimeUnit, CountDownLatch }
-import akka.actor.{ IllegalActorStateException, Actor }
-import Actor._
+import akka.actor.Actor._
 import akka.dispatch.{ MessageQueue, Dispatchers }
+import akka.actor.{ LocalActorRef, IllegalActorStateException, Actor }
 
 object BalancingDispatcherSpec {
 
@@ -59,8 +59,8 @@ class BalancingDispatcherSpec extends JUnitSuite with MustMatchers {
   def fastActorShouldStealWorkFromSlowActor {
     val finishedCounter = new CountDownLatch(110)
 
-    val slow = actorOf(new DelayableActor(50, finishedCounter), "slow").start
-    val fast = actorOf(new DelayableActor(10, finishedCounter), "fast").start
+    val slow = actorOf(new DelayableActor(50, finishedCounter), "slow").start.asInstanceOf[LocalActorRef]
+    val fast = actorOf(new DelayableActor(10, finishedCounter), "fast").start.asInstanceOf[LocalActorRef]
 
     var sentToFast = 0
 

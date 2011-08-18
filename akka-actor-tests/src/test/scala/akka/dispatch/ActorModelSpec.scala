@@ -12,9 +12,9 @@ import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.{ ConcurrentHashMap, CountDownLatch, TimeUnit }
 import akka.actor.dispatch.ActorModelSpec.MessageDispatcherInterceptor
 import akka.util.Switch
-import akka.actor.{ ActorKilledException, PoisonPill, ActorRef, Actor }
 import java.rmi.RemoteException
 import org.junit.{ After, Test }
+import akka.actor._
 
 object ActorModelSpec {
 
@@ -103,22 +103,22 @@ object ActorModelSpec {
       stats.get(actorRef)
     }
 
-    abstract override def suspend(actorRef: ActorRef) {
+    abstract override def suspend(actorRef: LocalActorRef) {
       super.suspend(actorRef)
       getStats(actorRef).suspensions.incrementAndGet()
     }
 
-    abstract override def resume(actorRef: ActorRef) {
+    abstract override def resume(actorRef: LocalActorRef) {
       super.resume(actorRef)
       getStats(actorRef).resumes.incrementAndGet()
     }
 
-    private[akka] abstract override def register(actorRef: ActorRef) {
+    private[akka] abstract override def register(actorRef: LocalActorRef) {
       super.register(actorRef)
       getStats(actorRef).registers.incrementAndGet()
     }
 
-    private[akka] abstract override def unregister(actorRef: ActorRef) {
+    private[akka] abstract override def unregister(actorRef: LocalActorRef) {
       super.unregister(actorRef)
       getStats(actorRef).unregisters.incrementAndGet()
     }
@@ -346,7 +346,7 @@ abstract class ActorModelSpec extends JUnitSuite {
   @Test
   def dispatcherShouldNotProcessMessagesForASuspendedActor {
     implicit val dispatcher = newInterceptedDispatcher
-    val a = newTestActor.start()
+    val a = newTestActor.start().asInstanceOf[LocalActorRef]
     val done = new CountDownLatch(1)
     dispatcher.suspend(a)
     a ! CountDown(done)
@@ -384,7 +384,7 @@ abstract class ActorModelSpec extends JUnitSuite {
   @Test
   def dispatcherShouldCompleteAllUncompletedSenderFuturesOnDeregister {
     implicit val dispatcher = newInterceptedDispatcher
-    val a = newTestActor.start()
+    val a = newTestActor.start().asInstanceOf[LocalActorRef]
     dispatcher.suspend(a)
     val f1: Future[String] = a ? Reply("foo") mapTo manifest[String]
     val stopped = a ? PoisonPill

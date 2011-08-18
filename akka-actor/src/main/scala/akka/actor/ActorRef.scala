@@ -539,10 +539,6 @@ abstract class ActorRef extends ActorRefShared with ForwardableChannel with Repl
 
   protected[akka] def supervisor_=(sup: Option[ActorRef])
 
-  protected[akka] def mailbox: AnyRef
-
-  protected[akka] def mailbox_=(value: AnyRef): AnyRef
-
   protected[akka] def handleTrapExit(dead: ActorRef, reason: Throwable)
 
   protected[akka] def restart(reason: Throwable, maxNrOfRetries: Option[Int], withinTimeRange: Option[Int])
@@ -623,7 +619,7 @@ class LocalActorRef private[akka] (private[this] val actorFactory: () ⇒ Actor,
   private var restartTimeWindowStartNanos: Long = 0L
 
   @volatile
-  private var _mailbox: AnyRef = _
+  protected[akka] var mailbox: AnyRef = _
 
   @volatile
   private[akka] var _dispatcher: MessageDispatcher = Dispatchers.defaultGlobalDispatcher
@@ -801,16 +797,6 @@ class LocalActorRef private[akka] (private[this] val actorFactory: () ⇒ Actor,
     link(actorRef)
     actorRef.start()
     actorRef
-  }
-
-  /**
-   * Returns the mailbox.
-   */
-  def mailbox: AnyRef = _mailbox
-
-  protected[akka] def mailbox_=(value: AnyRef): AnyRef = {
-    _mailbox = value;
-    value
   }
 
   /**
@@ -1258,10 +1244,6 @@ private[akka] case class RemoteActorRef private[akka] (
 
   def linkedActors: JMap[Uuid, ActorRef] = unsupported
 
-  protected[akka] def mailbox: AnyRef = unsupported
-
-  protected[akka] def mailbox_=(value: AnyRef): AnyRef = unsupported
-
   protected[akka] def handleTrapExit(dead: ActorRef, reason: Throwable) {
     unsupported
   }
@@ -1401,6 +1383,9 @@ trait ScalaActorRef extends ActorRefShared with ForwardableChannel with ReplyCha
   }
 }
 
+/**
+ * Memento pattern for serializing ActorRefs transparently
+ */
 case class SerializedActorRef(uuid: Uuid,
                               address: String,
                               hostname: String,
@@ -1443,10 +1428,6 @@ trait UnsupportedActorRef extends ActorRef with ScalaActorRef {
   def supervisor: Option[ActorRef] = unsupported
 
   def linkedActors: JMap[Uuid, ActorRef] = unsupported
-
-  protected[akka] def mailbox: AnyRef = unsupported
-
-  protected[akka] def mailbox_=(value: AnyRef): AnyRef = unsupported
 
   protected[akka] def handleTrapExit(dead: ActorRef, reason: Throwable) {
     unsupported

@@ -5,9 +5,9 @@
 package akka.agent
 
 import akka.stm._
-import akka.actor.Actor
 import akka.japi.{ Function ⇒ JFunc, Procedure ⇒ JProc }
 import akka.dispatch.{ DefaultPromise, Dispatchers, Future }
+import akka.actor.{ LocalActorRef, Actor }
 
 /**
  * Used internally to send functions.
@@ -94,7 +94,7 @@ object Agent {
  */
 class Agent[T](initialValue: T) {
   private[akka] val ref = Ref(initialValue)
-  private[akka] val updater = Actor.actorOf(new AgentUpdater(this)).start()
+  private[akka] val updater = Actor.actorOf(new AgentUpdater(this)).start().asInstanceOf[LocalActorRef] //TODO can we avoid this somehow?
 
   /**
    * Read the internal state of the agent.

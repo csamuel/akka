@@ -4,9 +4,9 @@
 
 package akka.routing
 
-import akka.actor.{ Actor, ActorRef, PoisonPill, Death, MaximumNumberOfRestartsWithinTimeRangeReached }
 import akka.dispatch.{ Promise }
 import akka.config.Supervision._
+import akka.actor._
 
 /**
  * Actor pooling
@@ -176,8 +176,13 @@ trait SmallestMailboxSelector {
     var set: Seq[ActorRef] = Nil
     var take = if (partialFill) math.min(selectionCount, delegates.length) else selectionCount
 
+    def mailboxSize(a: ActorRef): Int = a match {
+      case l: LocalActorRef ⇒ l.dispatcher.mailboxSize(l)
+      case _                ⇒ Int.MaxValue //Non-local actors mailbox size is unknown, so consider them lowest priority
+    }
+
     while (take > 0) {
-      set = delegates.sortWith((a, b) ⇒ a.dispatcher.mailboxSize(a) < b.dispatcher.mailboxSize(b)).take(take) ++ set //Question, doesn't this risk selecting the same actor multiple times?
+      set = delegates.sortWith((a, b) ⇒ mailboxSize(a) < mailboxSize(b)).take(take) ++ set //Question, doesn't this risk selecting the same actor multiple times?
       take -= set.size
     }
 
@@ -257,7 +262,10 @@ trait BoundedCapacitor {
 trait MailboxPressureCapacitor {
   def pressureThreshold: Int
   def pressure(delegates: Seq[ActorRef]): Int =
-    delegates count { a ⇒ a.dispatcher.mailboxSize(a) > pressureThreshold }
+    delegates count {
+      case a: LocalActorRef ⇒ a.dispatcher.mailboxSize(a) > pressureThreshold
+      case _                ⇒ false
+    }
 }
 
 /**

@@ -645,7 +645,7 @@ package japi {
   /* Java API */
   trait Future[+T] { self: akka.dispatch.Future[T] ⇒
     private[japi] final def onTimeout[A >: T](proc: Procedure[akka.dispatch.Future[A]]): this.type = self.onTimeout(proc(_))
-    private[japi] final def onResult[A >: T](proc: Procedure[A]): this.type = self.onResult({ case r: A ⇒ proc(r) }: PartialFunction[T, Unit])
+    private[japi] final def onResult[A >: T](proc: Procedure[A]): this.type = self.onResult({ case r ⇒ proc(r.asInstanceOf[A]) }: PartialFunction[T, Unit])
     private[japi] final def onException(proc: Procedure[Throwable]): this.type = self.onException({ case t: Throwable ⇒ proc(t) }: PartialFunction[Throwable, Unit])
     private[japi] final def onComplete[A >: T](proc: Procedure[akka.dispatch.Future[A]]): this.type = self.onComplete(proc(_))
     private[japi] final def map[A >: T, B](f: JFunc[A, B]): akka.dispatch.Future[B] = self.map(f(_))

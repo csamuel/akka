@@ -1,10 +1,9 @@
 package akka.dispatch
 
 import akka.actor.Actor._
-import akka.actor.Actor
 import org.scalatest.WordSpec
 import org.scalatest.matchers.MustMatchers
-import java.util.concurrent.CountDownLatch
+import akka.actor.{ LocalActorRef, Actor }
 
 class PriorityDispatcherSpec extends WordSpec with MustMatchers {
 
@@ -35,7 +34,7 @@ class PriorityDispatcherSpec extends WordSpec with MustMatchers {
         case i: Int  ⇒ acc = i :: acc
         case 'Result ⇒ self tryReply acc
       }
-    }).start()
+    }).start().asInstanceOf[LocalActorRef]
 
     dispatcher.suspend(actor) //Make sure the actor isn't treating any messages, let it buffer the incoming messages
 

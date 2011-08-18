@@ -80,17 +80,18 @@ object DeploymentConfig {
   // --------------------------------
   // --- Replicas
   // --------------------------------
-  sealed case class ReplicationFactor(val factor: Int) {
+
+  case class ReplicationFactor(val factor: Int) {
     if (factor < 0) throw new IllegalArgumentException("replication-factor can not be negative")
   }
 
   // For Java API
-  case class AutoReplicationFactor() extends ReplicationFactor(-1)
-  case class ZeroReplicationFactor() extends ReplicationFactor(0)
+  class AutoReplicationFactor extends ReplicationFactor(-1)
+  class ZeroReplicationFactor extends ReplicationFactor(0)
 
   // For Scala API
-  case object AutoReplicationFactor extends ReplicationFactor(-1)
-  case object ZeroReplicationFactor extends ReplicationFactor(0)
+  case object AutoReplicationFactor extends AutoReplicationFactor
+  case object ZeroReplicationFactor extends ZeroReplicationFactor
 
   // --------------------------------
   // --- Replication
